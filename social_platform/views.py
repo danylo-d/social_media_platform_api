@@ -1,14 +1,18 @@
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from social_platform.models import UserProfile
+from social_platform.models import UserProfile, Post
 from social_platform.permissions import IsOwnerOrReadOnly
 from social_platform.serializers import (
     UserProfileSerializer,
     UserProfileListSerializer,
     FollowersSerializer,
     SubscriptionSerializer,
+    PostSerializer,
+    PostListSerializer,
 )
 
 
@@ -81,3 +85,71 @@ class UserProfileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "username",
+                type=str,
+                description="Filtering by username",
+                required=False,
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    permission_classes = (IsOwnerOrReadOnly, IsAuthenticated)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        serializer.save(user=user)
+
+    def get_queryset(self):
+        hashtags = self.request.query_params.get("hashtags")
+        username = self.request.query_params.get("username")
+
+        queryset = (
+            self.queryset.prefetch_related("user__user_profile__followers").filter(
+                user__user_profile__followers__in=[self.request.user]
+            )
+            | self.request.user.posts.all()
+        )
+
+        if hashtags:
+            queryset = self.queryset.filter(hashtags__icontains=hashtags)
+
+        if username:
+            queryset = self.queryset.filter(
+                user__user_profile__username__icontains=username
+            )
+
+        return queryset.distinct()
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PostListSerializer
+        return PostSerializer
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "username",
+                type=str,
+                description="Filtering by username",
+                required=False,
+            ),
+            OpenApiParameter(
+                "hashtags",
+                type=str,
+                description="Filtering by hashtag",
+                required=False,
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)

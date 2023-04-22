@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 
-from social_platform.models import UserProfile
+from social_platform.models import UserProfile, Post
 from user.models import User
 
 
@@ -58,3 +58,29 @@ class UserProfileListSerializer(UserProfileSerializer):
             "amount_of_followers",
             "amount_of_subscriptions",
         )
+
+
+class PostSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(source="user.user_profile.username", read_only=True)
+    full_name = serializers.CharField(source="user.user_profile.full_name", read_only=True)
+
+    class Meta:
+        model = Post
+        fields = ("id", "user", "full_name", "content", "image", "hashtags", "created_at")
+        read_only_fields = ("user",)
+
+
+class PostListSerializer(PostSerializer):
+    user = serializers.CharField(source="user.user_profile.username", read_only=True)
+
+    class Meta:
+        model = Post
+        fields = (
+            "id",
+            "user",
+            "image",
+            "content_preview",
+            "hashtags",
+            "created_at",
+        )
+        read_only_fields = ("user",)
