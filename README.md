@@ -30,3 +30,8 @@ Windows:
 ```shell
   docker-compose up --build
 ```
+
+## Documentation:
+```shell
+  localhost/api/doc/swagger
+```
